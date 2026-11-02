@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Телефонная книга</title>
+<style>
+  :root { --acc:#0f766e; --acc2:#115e59; --bg:#f0f4f3; --line:#d9e2e0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:#1f2a2a; }
+  header { background:var(--acc); color:#fff; padding:18px 32px; display:flex; align-items:center; gap:12px; }
+  header h1 { margin:0; font-size:22px; font-weight:600; }
+  header span { opacity:.75; font-size:14px; margin-left:auto; }
+  main { max-width:1000px; margin:24px auto; padding:0 16px; display:grid; grid-template-columns:300px 1fr; gap:20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px; }
+  h2 { margin:0 0 14px; font-size:17px; }
+  label { display:block; font-size:12px; color:#5b6b6a; margin:10px 0 4px; }
+  input, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  .btns { display:flex; gap:8px; margin-top:14px; }
+  button { border:0; border-radius:6px; padding:8px 14px; font-size:13px; cursor:pointer; background:var(--acc); color:#fff; }
+  button:hover { background:var(--acc2); }
+  button.sec { background:#e3ebe9; color:#1f2a2a; }
+  button.del { background:#c2410c; }
+  .search { display:flex; gap:8px; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-size:12px; color:#5b6b6a; font-weight:500; padding:8px; border-bottom:1px solid var(--line); }
+  td { padding:9px 8px; border-bottom:1px solid #eef2f1; }
+  tr.sel td { background:#e6f4f1; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:10px; background:#e3ebe9; }
+  td.act { white-space:nowrap; text-align:right; }
+  td.act button { padding:5px 10px; font-size:12px; }
+  .empty { color:#8a9998; padding:16px 8px; }
+</style>
+</head>
+<body>
+<header><h1>📒 Телефонная книга</h1><span>Нагаев В. — практическая работа 5</span></header>
+<main>
+  <section class="card">
+    <h2 id="formTitle">Новый контакт</h2>
+    <form id="form">
+      <label>Имя</label><input id="name" required placeholder="Фамилия Имя">
+      <label>Телефон</label><input id="phone" required placeholder="+7 (___) ___-__-__">
+      <label>Email</label><input id="email" placeholder="name@mail.ru">
+      <label>Категория</label>
+      <select id="category"><option>Друзья</option><option>Семья</option><option>Работа</option></select>
+      <div class="btns"><button type="submit">Сохранить</button><button type="button" class="sec" id="cancel">Отмена</button></div>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Контакты <span id="count" class="tag"></span></h2>
+    <div class="search"><input id="q" placeholder="Поиск по имени, телефону, email"><button id="find">Найти</button><button class="sec" id="all">Все</button></div>
+    <table><thead><tr><th>Имя</th><th>Телефон</th><th>Email</th><th>Категория</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+  </section>
+</main>
+<script>
+const api = '/api/contacts';
+let editId = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load(q = '') {
+  const list = await (await fetch(api + (q ? '?q=' + encodeURIComponent(q) : ''))).json();
+  $('count').textContent = list.length;
+  $('rows').innerHTML = list.length ? list.map(c => `<tr class="${c._id === editId ? 'sel' : ''}">
+    <td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td><td><span class="tag">${esc(c.category)}</span></td>
+    <td class="act"><button class="sec" onclick="edit('${c._id}')">Изменить</button> <button class="del" onclick="del('${c._id}')">Удалить</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty">Ничего не найдено</td></tr>';
+}
+async function edit(id) {
+  const c = await (await fetch(api + '/' + id)).json();
+  editId = id; $('formTitle').textContent = 'Редактирование контакта';
+  ['name','phone','email','category'].forEach(k => $(k).value = c[k]);
+  load($('q').value);
+}
+async function del(id) { await fetch(api + '/' + id, { method: 'DELETE' }); if (editId === id) reset(); load($('q').value); }
+function reset() { editId = null; $('form').reset(); $('formTitle').textContent = 'Новый контакт'; }
+$('form').onsubmit = async e => {
+  e.preventDefault();
+  const body = JSON.stringify({ name: $('name').value, phone: $('phone').value, email: $('email').value, category: $('category').value });
+  await fetch(editId ? api + '/' + editId : api, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  reset(); load($('q').value);
+};
+$('cancel').onclick = () => { reset(); load($('q').value); };
+$('find').onclick = () => load($('q').value);
+$('all').onclick = () => { $('q').value = ''; load(); };
+load();
+</script>
+</body>
+</html>
